@@ -1,0 +1,46 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+backend/venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Local development
+.env
+*.pem
+cert.pem
+key.pem
+
+# Screenshots
+*.png
+
+# Node modules (if any)
+node_modules/
+
+# Build artifacts
+dist/
+build/

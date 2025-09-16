@@ -1,0 +1,1097 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#1B998B">
+    <title>Nightingale-Chat - Medical Messaging</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icons/icon-192x192.png">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f0f2f5;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #1B998B, #2DD4BF);
+            color: white;
+            display: none;
+            padding: 1rem;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .header h1 {
+            font-size: 1.2rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+        }
+
+        .header h1 img {
+            width: 32px;
+            height: 32px;
+            margin-right: 8px;
+        }
+
+        .status {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+
+        .login-screen {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            padding: 2rem;
+        }
+
+        .login-form {
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .login-form h2 {
+            margin-bottom: 1rem;
+            color: #333;
+            text-align: center;
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #555;
+            font-weight: 500;
+        }
+
+        .form-group input, .form-group textarea {
+            width: 100%;
+            padding: 0.75rem;
+            border: 2px solid #e1e1e1;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-family: inherit;
+            resize: vertical;
+        }
+
+        .form-group input:focus, .form-group textarea:focus {
+            outline: none;
+            border-color: #1B998B;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 0.75rem;
+            background: #1B998B;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .btn:hover {
+            background: #1ea952;
+        }
+
+        .page {
+            display: none;
+            flex: 1;
+            flex-direction: column;
+            height: calc(100vh - 80px);
+            overflow-y: auto;
+        }
+
+        .page.active {
+            display: flex;
+        }
+
+        .chat-container {
+            flex: 1;
+            flex-direction: column;
+        }
+
+        .messages {
+            flex: 1;
+            padding: 1rem;
+            overflow-y: auto;
+            background: #f0f2f5;
+        }
+
+        .message {
+            margin-bottom: 1rem;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .message.own {
+            align-items: flex-end;
+        }
+
+        .message-bubble {
+            max-width: 70%;
+            padding: 0.75rem 1rem;
+            border-radius: 18px;
+            position: relative;
+            word-wrap: break-word;
+        }
+
+        .message.own .message-bubble {
+            background: #dcf8c6;
+            border-bottom-right-radius: 6px;
+        }
+
+        .message:not(.own) .message-bubble {
+            background: white;
+            border-bottom-left-radius: 6px;
+        }
+
+        .message-sender {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #1B998B;
+            margin-bottom: 0.25rem;
+        }
+
+        .message-text {
+            line-height: 1.4;
+        }
+
+        .message-time {
+            font-size: 0.7rem;
+            color: #667781;
+            margin-top: 0.25rem;
+            text-align: right;
+        }
+
+        .system-message {
+            text-align: center;
+            color: #8696a0;
+            font-size: 0.8rem;
+            margin: 1rem 0;
+            padding: 0.5rem;
+            background: rgba(134, 150, 160, 0.1);
+            border-radius: 6px;
+        }
+
+        .input-container {
+            padding: 1rem;
+            background: white;
+            border-top: 1px solid #e1e1e1;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .message-input {
+            flex: 1;
+            padding: 0.75rem 1rem;
+            border: 1px solid #e1e1e1;
+            border-radius: 25px;
+            font-size: 1rem;
+            outline: none;
+        }
+
+        .message-input:focus {
+            border-color: #1B998B;
+        }
+
+        .send-btn {
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, #1B998B, #2DD4BF);
+            border: none;
+            border-radius: 50%;
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+        }
+
+        .send-btn:hover {
+            background: linear-gradient(135deg, #189A8B, #28C4A8);
+        }
+
+        .online-count {
+            font-size: 0.8rem;
+            opacity: 0.8;
+        }
+
+        .clickable-user {
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+
+        .clickable-user:hover {
+            color: #1B998B;
+            text-decoration: underline;
+        }
+
+        /* Page Styles */
+        .page-header {
+            padding: 2rem 1rem 1rem 1rem;
+            background: linear-gradient(135deg, #f8fffe, #e8f8f6);
+            border-bottom: 1px solid #e1e8e6;
+        }
+
+        .page-header h2 {
+            color: #1B998B;
+            margin-bottom: 0.5rem;
+            font-size: 1.5rem;
+        }
+
+        .page-header p {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .profile-content, .edu-content {
+            flex: 1;
+            padding: 1rem;
+        }
+
+        .profile-section, .edu-section {
+            background: white;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .edu-section h3 {
+            color: #1B998B;
+            margin-bottom: 1rem;
+            font-size: 1.2rem;
+        }
+
+        .edu-item {
+            padding: 1rem 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .edu-item:last-child {
+            border-bottom: none;
+        }
+
+        .edu-item h4 {
+            color: #333;
+            margin-bottom: 0.5rem;
+            font-size: 1rem;
+        }
+
+        .edu-item p {
+            color: #666;
+            font-size: 0.9rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .edu-status {
+            background: #1B998B;
+            color: white;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+        }
+
+        /* Bottom Navigation */
+        .bottom-nav {
+            display: none;
+            background: white;
+            border-top: 1px solid #e1e1e1;
+            height: 80px;
+            box-shadow: 0 -2px 8px rgba(0,0,0,0.1);
+        }
+
+        .nav-item {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            padding: 0.5rem;
+        }
+
+        .nav-item:hover {
+            background: #f8fffe;
+        }
+
+        .nav-item.active {
+            color: #1B998B;
+            background: #f0f9f7;
+        }
+
+        .nav-icon {
+            font-size: 1.5rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .nav-label {
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        /* Overlay Alert */
+        .overlay-alert {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .overlay-alert.show {
+            display: flex;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .overlay-content {
+            background: white;
+            border-radius: 12px;
+            padding: 0;
+            max-width: 90%;
+            width: 400px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            animation: slideUp 0.3s ease;
+            overflow: hidden;
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateY(30px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .overlay-header {
+            background: linear-gradient(135deg, #1B998B, #2DD4BF);
+            color: white;
+            padding: 1.5rem;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .overlay-icon {
+            width: 48px;
+            height: 48px;
+            margin-bottom: 0.5rem;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2);
+            padding: 8px;
+        }
+
+        .overlay-header h3 {
+            margin: 0;
+            font-size: 1.2rem;
+            font-weight: 600;
+        }
+
+        .overlay-body {
+            padding: 2rem;
+            text-align: center;
+        }
+
+        .overlay-body p {
+            margin: 0;
+            color: #444;
+            font-size: 1rem;
+            line-height: 1.5;
+        }
+
+        .overlay-footer {
+            padding: 1rem 2rem 2rem 2rem;
+            text-align: center;
+        }
+
+        .overlay-btn {
+            background: linear-gradient(135deg, #1B998B, #2DD4BF);
+            color: white;
+            border: none;
+            padding: 0.75rem 2rem;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            min-width: 100px;
+        }
+
+        .overlay-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(27, 153, 139, 0.3);
+        }
+
+        .overlay-btn:active {
+            transform: translateY(0);
+        }
+
+        /* Admin Page Styles */
+        .admin-content {
+            flex: 1;
+            padding: 1rem;
+        }
+
+        .admin-section {
+            background: white;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .admin-section h3 {
+            color: #1B998B;
+            margin-bottom: 1rem;
+            font-size: 1.2rem;
+        }
+
+        .alert-form {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .alert-form select {
+            width: 100%;
+            padding: 0.75rem;
+            border: 2px solid #e1e1e1;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-family: inherit;
+        }
+
+        .alert-form select:focus {
+            outline: none;
+            border-color: #1B998B;
+        }
+
+        .form-actions {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #1B998B, #2DD4BF);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(27, 153, 139, 0.3);
+        }
+
+        .btn-secondary {
+            background: white;
+            color: #1B998B;
+            border: 2px solid #1B998B;
+            padding: 0.75rem 1.5rem;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-secondary:hover {
+            background: #1B998B;
+            color: white;
+            transform: translateY(-2px);
+        }
+
+        /* Alert History */
+        .alert-history {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .alert-history-item {
+            padding: 1rem;
+            border: 1px solid #e1e1e1;
+            border-radius: 6px;
+            background: #f9f9f9;
+        }
+
+        .alert-history-title {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 0.5rem;
+        }
+
+        .alert-history-meta {
+            font-size: 0.9rem;
+            color: #666;
+        }
+
+        /* Admin Stats */
+        .admin-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #f8fffe, #e8f8f6);
+            border: 1px solid #1B998B;
+            border-radius: 8px;
+            padding: 1.5rem;
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #1B998B;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            color: #666;
+            font-weight: 500;
+        }
+
+        /* Profile Form Styles */
+        .profile-form {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        .profile-form select {
+            width: 100%;
+            padding: 0.75rem;
+            border: 2px solid #e1e1e1;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-family: inherit;
+            background-color: white;
+        }
+
+        .profile-form select:focus {
+            outline: none;
+            border-color: #1B998B;
+        }
+
+        .char-counter {
+            text-align: right;
+            font-size: 0.8rem;
+            color: #666;
+            margin-top: 0.5rem;
+        }
+
+        .profile-form-actions {
+            display: flex;
+            gap: 1rem;
+            margin-top: 2rem;
+            justify-content: flex-end;
+        }
+
+        /* Profile Card Preview */
+        .profile-card {
+            background: linear-gradient(135deg, #f8fffe, #e8f8f6);
+            border: 2px solid #1B998B;
+            border-radius: 12px;
+            padding: 2rem;
+            margin-top: 1rem;
+        }
+
+        .profile-card-header {
+            text-align: center;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid #1B998B;
+        }
+
+        .profile-card-name {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #1B998B;
+            margin-bottom: 0.5rem;
+        }
+
+        .profile-card-title {
+            font-size: 1.1rem;
+            color: #666;
+            margin-bottom: 0.5rem;
+        }
+
+        .profile-card-department {
+            background: #1B998B;
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            display: inline-block;
+        }
+
+        .profile-card-section {
+            margin-bottom: 1.5rem;
+        }
+
+        .profile-card-section h4 {
+            color: #1B998B;
+            margin-bottom: 0.75rem;
+            font-size: 1rem;
+            border-left: 4px solid #1B998B;
+            padding-left: 0.75rem;
+        }
+
+        .profile-card-section p {
+            margin: 0.5rem 0;
+            color: #444;
+            line-height: 1.5;
+        }
+
+        .profile-card-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+        }
+
+        .profile-tag {
+            background: #e8f8f6;
+            color: #1B998B;
+            padding: 0.25rem 0.75rem;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            border: 1px solid #1B998B;
+        }
+
+        .availability-badge {
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+
+        .availability-available {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .availability-limited {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+
+        .availability-unavailable {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        @media (max-width: 768px) {
+            .header {
+                padding: 0.75rem;
+            }
+
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+
+            .profile-form-actions {
+                flex-direction: column;
+            }
+
+            .profile-card {
+                padding: 1.5rem;
+            }
+
+            .profile-card-name {
+                font-size: 1.3rem;
+            }
+
+            .message-bubble {
+                max-width: 85%;
+            }
+
+            .input-container {
+                padding: 0.75rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div>
+            <h1><img src="ngchat.png" alt="Nightingale Chat"> Nightingale-Chat</h1>
+            <div class="status" id="connectionStatus">Connecting...</div>
+        </div>
+        <div class="online-count" id="onlineCount">0 online</div>
+    </div>
+
+    <div class="login-screen" id="loginScreen">
+        <div class="login-form">
+            <h2>Join Nightingale-Chat</h2>
+            <form id="loginForm">
+                <div class="form-group">
+                    <label for="username">Your Name</label>
+                    <input type="text" id="username" placeholder="Enter your name" required>
+                </div>
+                <div class="form-group">
+                    <label for="department">Department</label>
+                    <input type="text" id="department" placeholder="e.g. Emergency, ICU, Pharmacy" required>
+                </div>
+                <div class="form-group">
+                    <label for="bio">Short Bio (Optional)</label>
+                    <textarea id="bio" placeholder="Brief professional background..." rows="3"></textarea>
+                </div>
+                <button type="submit" class="btn">Join Chat</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="chat-container page" id="chatContainer">
+        <div class="messages" id="messages"></div>
+        <div class="input-container">
+            <input type="text" id="messageInput" class="message-input" placeholder="Type a message..." maxlength="1000">
+            <button id="sendBtn" class="send-btn">➤</button>
+        </div>
+    </div>
+
+    <!-- Profile Page -->
+    <div class="profile-container page" id="profileContainer">
+        <div class="page-header">
+            <h2>👨‍⚕️ Professional Profile</h2>
+            <p>Create your medical professional profile</p>
+        </div>
+        <div class="profile-content">
+            <!-- Profile Form Section -->
+            <div class="profile-section">
+                <h3>📋 Professional Information</h3>
+                <form id="profileForm" class="profile-form">
+                    <!-- Basic Info -->
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="profileName">Full Name *</label>
+                            <input type="text" id="profileName" placeholder="Dr. John Smith" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="profileTitle">Professional Title *</label>
+                            <input type="text" id="profileTitle" placeholder="Cardiologist, Emergency Physician, etc." required>
+                        </div>
+                    </div>
+
+                    <!-- Department & Specialization -->
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="profileDepartment">Department *</label>
+                            <select id="profileDepartment" required>
+                                <option value="">Select Department</option>
+                                <option value="Emergency">Emergency Department</option>
+                                <option value="ICU">Intensive Care Unit</option>
+                                <option value="Cardiology">Cardiology</option>
+                                <option value="Neurology">Neurology</option>
+                                <option value="Surgery">Surgery</option>
+                                <option value="Pediatrics">Pediatrics</option>
+                                <option value="Pharmacy">Pharmacy</option>
+                                <option value="Nursing">Nursing</option>
+                                <option value="Radiology">Radiology</option>
+                                <option value="Laboratory">Laboratory</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="profileSpecialty">Specialty/Subspecialty</label>
+                            <input type="text" id="profileSpecialty" placeholder="e.g. Interventional Cardiology, Trauma Surgery">
+                        </div>
+                    </div>
+
+                    <!-- Qualifications -->
+                    <div class="form-group">
+                        <label for="profileQualifications">Qualifications & Certifications</label>
+                        <textarea id="profileQualifications" rows="3" placeholder="e.g. MD from Harvard Medical School, Board Certified in Emergency Medicine, ACLS, PALS"></textarea>
+                    </div>
+
+                    <!-- Experience -->
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="profileExperience">Years of Experience</label>
+                            <select id="profileExperience">
+                                <option value="">Select Experience</option>
+                                <option value="0-2">0-2 years</option>
+                                <option value="3-5">3-5 years</option>
+                                <option value="6-10">6-10 years</option>
+                                <option value="11-15">11-15 years</option>
+                                <option value="16-20">16-20 years</option>
+                                <option value="20+">20+ years</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="profileLanguages">Languages Spoken</label>
+                            <input type="text" id="profileLanguages" placeholder="English, Spanish, French, etc.">
+                        </div>
+                    </div>
+
+                    <!-- Location -->
+                    <div class="form-group">
+                        <label for="profileLocation">Hospital/Clinic Location *</label>
+                        <input type="text" id="profileLocation" placeholder="123 Medical Center Drive, City, State" required>
+                    </div>
+
+                    <!-- Contact -->
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="profilePhone">Professional Phone</label>
+                            <input type="tel" id="profilePhone" placeholder="+1 (555) 123-4567">
+                        </div>
+                        <div class="form-group">
+                            <label for="profileEmail">Professional Email</label>
+                            <input type="email" id="profileEmail" placeholder="doctor@hospital.com">
+                        </div>
+                    </div>
+
+                    <!-- Bio -->
+                    <div class="form-group">
+                        <label for="profileBio">Professional Bio</label>
+                        <textarea id="profileBio" rows="4" placeholder="Brief professional background, interests, and areas of expertise..."></textarea>
+                        <div class="char-counter">
+                            <span id="bioCharCount">0</span>/500 characters
+                        </div>
+                    </div>
+
+                    <!-- Availability -->
+                    <div class="form-group">
+                        <label for="profileAvailability">Availability for Consultation</label>
+                        <select id="profileAvailability">
+                            <option value="available">Available for consultation</option>
+                            <option value="limited">Limited availability</option>
+                            <option value="unavailable">Not available</option>
+                        </select>
+                    </div>
+
+                    <!-- Form Actions -->
+                    <div class="profile-form-actions">
+                        <button type="button" id="previewProfile" class="btn btn-secondary">👁️ Preview Profile</button>
+                        <button type="submit" class="btn btn-primary">💾 Save Profile</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Profile Preview Section -->
+            <div class="profile-section" id="profilePreview" style="display: none;">
+                <h3>📋 Profile Preview</h3>
+                <div class="profile-card" id="profileCard">
+                    <!-- Preview content will be generated here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Education Page -->
+    <div class="edu-container page" id="eduContainer">
+        <div class="page-header">
+            <h2>Medical Education Hub</h2>
+            <p>Learn, grow, and stay updated</p>
+        </div>
+        <div class="edu-content">
+            <div class="edu-section">
+                <h3>📚 Articles</h3>
+                <div class="edu-item">
+                    <h4>Latest Medical Research</h4>
+                    <p>Stay updated with cutting-edge medical research and clinical studies.</p>
+                    <span class="edu-status">Coming Soon</span>
+                </div>
+                <div class="edu-item">
+                    <h4>Best Practices</h4>
+                    <p>Evidence-based guidelines and protocols for various medical procedures.</p>
+                    <span class="edu-status">Coming Soon</span>
+                </div>
+            </div>
+
+            <div class="edu-section">
+                <h3>❓ FAQ</h3>
+                <div class="edu-item">
+                    <h4>Common Medical Questions</h4>
+                    <p>Frequently asked questions from medical professionals answered by experts.</p>
+                    <span class="edu-status">Coming Soon</span>
+                </div>
+            </div>
+
+            <div class="edu-section">
+                <h3>📅 Events</h3>
+                <div class="edu-item">
+                    <h4>Medical Conferences</h4>
+                    <p>Upcoming conferences, seminars, and continuing education opportunities.</p>
+                    <span class="edu-status">Coming Soon</span>
+                </div>
+                <div class="edu-item">
+                    <h4>Training Sessions</h4>
+                    <p>Hands-on training and skill development workshops.</p>
+                    <span class="edu-status">Coming Soon</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin Page -->
+    <div class="admin-container page" id="adminContainer">
+        <div class="page-header">
+            <h2>⚙️ Admin Dashboard</h2>
+            <p>Manage promotional alerts and announcements</p>
+        </div>
+        <div class="admin-content">
+            <!-- Alert Composer Section -->
+            <div class="admin-section">
+                <h3>📢 Create Promotional Alert</h3>
+                <form id="alertForm" class="alert-form">
+                    <div class="form-group">
+                        <label for="alertTitle">Alert Title</label>
+                        <input type="text" id="alertTitle" placeholder="e.g. 🚀 New Feature Announcement" maxlength="100" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="alertMessage">Alert Message</label>
+                        <textarea id="alertMessage" placeholder="Enter your promotional message here..." rows="4" maxlength="500" required></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="alertTarget">Target Audience</label>
+                        <select id="alertTarget">
+                            <option value="all">All Users</option>
+                            <option value="emergency">Emergency Department</option>
+                            <option value="icu">ICU</option>
+                            <option value="pharmacy">Pharmacy</option>
+                            <option value="nursing">Nursing</option>
+                        </select>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" id="previewAlert" class="btn btn-secondary">👁️ Preview</button>
+                        <button type="submit" class="btn btn-primary">📤 Send Alert</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Alert History Section -->
+            <div class="admin-section">
+                <h3>📋 Recent Alerts</h3>
+                <div id="alertHistory" class="alert-history">
+                    <div class="alert-history-item">
+                        <div class="alert-history-title">🚀 New Features Coming!</div>
+                        <div class="alert-history-meta">Sent to All Users • 5 minutes ago • 12 views</div>
+                    </div>
+                    <div class="alert-history-item">
+                        <div class="alert-history-title">📅 Maintenance Schedule</div>
+                        <div class="alert-history-meta">Sent to All Users • 2 hours ago • 45 views</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Admin Stats Section -->
+            <div class="admin-section">
+                <h3>📊 Statistics</h3>
+                <div class="admin-stats">
+                    <div class="stat-card">
+                        <div class="stat-number" id="onlineUsersCount">0</div>
+                        <div class="stat-label">Online Users</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number">156</div>
+                        <div class="stat-label">Total Alerts Sent</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number">92%</div>
+                        <div class="stat-label">View Rate</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Promotional Overlay -->
+    <div class="overlay-alert" id="overlayAlert">
+        <div class="overlay-content">
+            <div class="overlay-header">
+                <img src="ngchat.png" alt="Nightingale Chat" class="overlay-icon">
+                <h3 id="overlayTitle">📢 Important Announcement</h3>
+            </div>
+            <div class="overlay-body">
+                <p id="overlayMessage">Your promotional message goes here...</p>
+            </div>
+            <div class="overlay-footer">
+                <button class="overlay-btn" id="overlayOkBtn">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom Navigation -->
+    <div class="bottom-nav" id="bottomNav">
+        <div class="nav-item active" data-page="chat">
+            <div class="nav-icon">💬</div>
+            <div class="nav-label">Chat</div>
+        </div>
+        <div class="nav-item" data-page="profile">
+            <div class="nav-icon">👥</div>
+            <div class="nav-label">Profiles</div>
+        </div>
+        <div class="nav-item" data-page="edu">
+            <div class="nav-icon">📚</div>
+            <div class="nav-label">Edu</div>
+        </div>
+        <div class="nav-item" data-page="admin" id="adminNavItem" style="display: none;">
+            <div class="nav-icon">⚙️</div>
+            <div class="nav-label">Admin</div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
