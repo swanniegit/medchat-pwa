@@ -130,7 +130,15 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str):
                     department = security.sanitize_input(message_data.get("department", ""), 200) if "department" in message_data else None
 
                     if user_name or department:
-                        await user_service.update_user_info(session, user_id, user_name, department)
+                        # Get current user data to avoid overwriting with None
+                        current_user = await user_service.get_user_by_id(session, user_id)
+                        if current_user:
+                            final_user_name = user_name if user_name else current_user.user_name
+                            final_department = department if department else current_user.department
+                            await user_service.create_or_update_user(session, user_id, final_user_name, final_department)
+                        else:
+                            # Create new user with provided info
+                            await user_service.create_or_update_user(session, user_id, user_name or user_id, department or "Unknown")
                         await session.commit()
 
             # Add server-side metadata

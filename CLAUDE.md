@@ -9,8 +9,9 @@ MedChat PWA is a WhatsApp clone for a closed group of 1000 medical workers. **Cu
 ## Architecture
 
 - **Backend**: FastAPI server with WebSocket support for real-time messaging
-  - Single file: `backend/main.py` - Contains FastAPI app, WebSocket connection manager, and all endpoints
-  - Uses in-memory storage (perfect for POC/local development)
+  - Modular architecture with separate services: `backend/main.py`, `backend/services/`, `backend/models/`
+  - Database integration: SQLAlchemy async ORM with SQLite (development) and PostgreSQL (production)
+  - Real-time messaging with persistent storage for messages and user sessions
   - CORS enabled for all origins (development setup)
 
 - **Frontend**: Vanilla JavaScript PWA
@@ -29,6 +30,46 @@ MedChat PWA is a WhatsApp clone for a closed group of 1000 medical workers. **Cu
 # For HTTPS development (secure setup)
 ./generate-ssl.sh    # Generate SSL certificates (one-time)
 ./start.sh           # Start with HTTPS/TLS
+```
+
+### Testing & Code Quality
+```bash
+# Run all tests
+./test.sh all
+
+# Run specific test categories
+./test.sh unit          # Unit tests only
+./test.sh integration   # Integration tests only
+./test.sh security      # Security-focused tests
+./test.sh coverage      # Tests with coverage report
+
+# Test individual components
+pytest backend/tests/unit/test_security_utils.py -v
+pytest backend/tests/unit/test_websocket_manager.py -v
+```
+
+### Database Operations
+```bash
+# Create new migration (after model changes)
+cd backend && source venv/bin/activate && alembic revision --autogenerate -m "Description of changes"
+
+# Apply migrations
+cd backend && source venv/bin/activate && alembic upgrade head
+
+# Check current migration status
+cd backend && source venv/bin/activate && alembic current
+
+# Downgrade migration (if needed)
+cd backend && source venv/bin/activate && alembic downgrade -1
+```
+
+### Docker Development
+```bash
+# Build Docker image
+docker build -t medchat-pwa .
+
+# Run with Docker
+docker run -p 8080:8080 medchat-pwa
 ```
 
 ### Security Setup (Recommended)
@@ -77,11 +118,13 @@ python3 -m http.server 3000
 
 ## Key Development Notes
 
-- **Real-time Communication**: Uses WebSocket connections (`/ws/{user_id}`) managed by `ConnectionManager` class
+- **Real-time Communication**: Uses WebSocket connections (`/ws/{user_id}`) managed by `ConnectionManager` class in `backend/main.py:134`
 - **User Management**: Simple in-memory user tracking with join/leave notifications
 - **PWA Features**: Includes service worker, manifest, and install prompts for native app-like experience
 - **No Build Process**: Pure vanilla JavaScript - no bundling or compilation required
 - **No Testing Framework**: Currently no test suite configured
+- **Frontend Architecture**: Single `NightingaleChat` class in `frontend/app.js` handles all UI interactions and WebSocket communication
+- **Security Implementation**: Comprehensive security features including rate limiting, input sanitization, and HTTPS support built into the backend
 
 ## Security Implementation (Production-Ready)
 

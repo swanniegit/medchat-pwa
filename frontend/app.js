@@ -424,17 +424,15 @@ class NightingaleChat {
     // Update WebSocket URL for HTTPS
     getWebSocketUrl() {
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const host = window.location.hostname;
-        const port = '8000';
-        return `${protocol}//${host}:${port}/ws/${this.userId}`;
+        const host = window.location.host; // includes port if any
+        return `${protocol}//${host}/ws/${this.userId}`;
     }
 
     // Get API URL matching current protocol
     getApiUrl() {
         const protocol = window.location.protocol === 'https:' ? 'https:' : 'http:';
-        const host = window.location.hostname;
-        const port = '8000';
-        return `${protocol}//${host}:${port}`;
+        const host = window.location.host; // includes port if any
+        return `${protocol}//${host}`;
     }
 
     // Overlay Alert Methods
