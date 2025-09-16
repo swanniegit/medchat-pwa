@@ -1,158 +1,46 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Depends
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.responses import Response
-from typing import List, Dict, Optional
+from datetime import datetime
 import json
 import uuid
-import re
-import hashlib
-import secrets
-from datetime import datetime, timedelta
-import html
+from contextlib import asynccontextmanager
 
-# Optional security imports (install with: pip install -r requirements.txt)
-try:
-    import bleach
-    BLEACH_AVAILABLE = True
-except ImportError:
-    BLEACH_AVAILABLE = False
-    print("⚠️  Warning: bleach not installed. HTML sanitization disabled.")
-    print("🔧 Run: pip install bleach for full security features")
+# Import modular components
+from security.middleware import SecurityHeadersMiddleware
+from security.utils import SecurityUtils
+from services.websocket_manager import ConnectionManager
+from services.database_service import MessageService, UserService
+from config.database import init_db, close_db, AsyncSessionLocal
+from models.db_models import Message
 
-app = FastAPI(title="Nightingale-Chat API", version="1.0.0")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Initialize database on startup
+    await init_db()
+    yield
+    # Close database connections on shutdown
+    await close_db()
 
-# Security middleware for headers
-class SecurityHeadersMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request, call_next):
-        response = await call_next(request)
+app = FastAPI(title="Nightingale-Chat API", version="1.0.0", lifespan=lifespan)
 
-        # Security headers
-        response.headers["X-Content-Type-Options"] = "nosniff"
-        response.headers["X-Frame-Options"] = "DENY"
-        response.headers["X-XSS-Protection"] = "1; mode=block"
-        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
-        response.headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'"
-        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-
-        return response
-
+# Add security middleware
 app.add_middleware(SecurityHeadersMiddleware)
 
+# CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://localhost:3000", "http://localhost:3000"],  # More restrictive
+    allow_origins=["https://localhost:3000", "http://localhost:3000"],
     allow_credentials=True,
-    allow_methods=["GET", "POST"],  # Only needed methods
+    allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
 
-# Rate limiting storage (in production, use Redis)
-rate_limit_storage = {}
-
-# Security utilities
-class SecurityUtils:
-    @staticmethod
-    def sanitize_input(text: str, max_length: int = 1000) -> str:
-        """Sanitize user input"""
-        if not text:
-            return ""
-
-        # Limit length
-        text = text[:max_length]
-
-        # Remove HTML tags and escape special characters
-        if BLEACH_AVAILABLE:
-            text = bleach.clean(text, tags=[], strip=True)
-
-        text = html.escape(text)
-
-        return text.strip()
-
-    @staticmethod
-    def validate_user_id(user_id: str) -> bool:
-        """Validate user ID format"""
-        if not user_id or len(user_id) > 100:
-            return False
-
-        # Only allow alphanumeric, underscore, and hyphen
-        return re.match(r'^[a-zA-Z0-9_-]+$', user_id) is not None
-
-    @staticmethod
-    def validate_message_length(message: str) -> bool:
-        """Validate message length"""
-        return 0 < len(message) <= 1000
-
-    @staticmethod
-    def hash_password(password: str) -> str:
-        """Hash password with salt"""
-        salt = secrets.token_hex(32)
-        pwd_hash = hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt.encode('utf-8'), 100000)
-        return salt + pwd_hash.hex()
-
-    @staticmethod
-    def verify_password(stored_password: str, provided_password: str) -> bool:
-        """Verify password against hash"""
-        salt = stored_password[:64]
-        stored_hash = stored_password[64:]
-        pwd_hash = hashlib.pbkdf2_hmac('sha256', provided_password.encode('utf-8'), salt.encode('utf-8'), 100000)
-        return pwd_hash.hex() == stored_hash
-
-    @staticmethod
-    def check_rate_limit(client_id: str, max_requests: int = 30, time_window: int = 60) -> bool:
-        """Simple rate limiting"""
-        now = datetime.now()
-
-        if client_id not in rate_limit_storage:
-            rate_limit_storage[client_id] = []
-
-        # Clean old entries
-        rate_limit_storage[client_id] = [
-            timestamp for timestamp in rate_limit_storage[client_id]
-            if (now - timestamp).seconds < time_window
-        ]
-
-        # Check if limit exceeded
-        if len(rate_limit_storage[client_id]) >= max_requests:
-            return False
-
-        # Add current request
-        rate_limit_storage[client_id].append(now)
-        return True
-
+# Initialize components
 security = SecurityUtils()
-
-class ConnectionManager:
-    def __init__(self):
-        self.active_connections: Dict[str, WebSocket] = {}
-        self.users: Dict[str, Dict] = {}
-
-    async def connect(self, websocket: WebSocket, user_id: str):
-        await websocket.accept()
-        self.active_connections[user_id] = websocket
-
-    def disconnect(self, user_id: str):
-        if user_id in self.active_connections:
-            del self.active_connections[user_id]
-        if user_id in self.users:
-            del self.users[user_id]
-
-    async def send_personal_message(self, message: str, user_id: str):
-        if user_id in self.active_connections:
-            websocket = self.active_connections[user_id]
-            await websocket.send_text(message)
-
-    async def broadcast(self, message: str, exclude_user: str = None):
-        for user_id, connection in self.active_connections.items():
-            if user_id != exclude_user:
-                try:
-                    await connection.send_text(message)
-                except:
-                    pass
-
 manager = ConnectionManager()
+message_service = MessageService()
+user_service = UserService()
 
 @app.get("/")
 async def root():
@@ -160,7 +48,16 @@ async def root():
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy", "active_users": len(manager.active_connections)}
+    return {"status": "healthy", "active_users": manager.get_connection_count()}
+
+@app.get("/users/online")
+async def get_online_users():
+    return await manager.get_online_users()
+
+@app.get("/messages/recent")
+async def get_recent_messages(limit: int = 50):
+    """Get recent messages from database"""
+    return await manager.get_recent_messages(limit)
 
 @app.websocket("/ws/{user_id}")
 async def websocket_endpoint(websocket: WebSocket, user_id: str):
@@ -175,16 +72,21 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str):
         await websocket.close(code=4029, reason="Rate limit exceeded")
         return
 
-    await manager.connect(websocket, user_id)
+    # Extract user info from first message or use defaults
+    user_name = user_id  # Default to user_id
+    department = "Unknown"  # Default department
+
+    await manager.connect(websocket, user_id, user_name, department)
 
     # Send user joined notification
     join_message = {
         "type": "user_joined",
         "user_id": user_id,
+        "text": f"User {user_id} joined the chat",
         "timestamp": datetime.now().isoformat(),
-        "message": f"User {user_id} joined the chat"
+        "message_id": str(uuid.uuid4())
     }
-    await manager.broadcast(json.dumps(join_message), exclude_user=user_id)
+    await manager.broadcast(json.dumps(join_message), exclude_user=user_id, save_to_db=False)
 
     try:
         while True:
@@ -221,44 +123,47 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str):
                 # Sanitize message text
                 message_data["text"] = security.sanitize_input(text, 1000)
 
-            # Sanitize other text fields
-            for field in ["user_name", "department", "bio"]:
-                if field in message_data:
-                    message_data[field] = security.sanitize_input(message_data[field], 200)
+            # Update user info if provided
+            if "user_name" in message_data or "department" in message_data:
+                async with AsyncSessionLocal() as session:
+                    user_name = security.sanitize_input(message_data.get("user_name", ""), 200) if "user_name" in message_data else None
+                    department = security.sanitize_input(message_data.get("department", ""), 200) if "department" in message_data else None
+
+                    if user_name or department:
+                        await user_service.update_user_info(session, user_id, user_name, department)
+                        await session.commit()
 
             # Add server-side metadata
             message_data.update({
                 "timestamp": datetime.now().isoformat(),
-                "message_id": str(uuid.uuid4())
+                "message_id": str(uuid.uuid4()),
+                "user_id": user_id
             })
 
-            # Broadcast message to all connected users
+            # Broadcast message to all connected users (will be saved to DB in broadcast method)
             await manager.broadcast(json.dumps(message_data), exclude_user=user_id)
 
     except WebSocketDisconnect:
-        manager.disconnect(user_id)
+        await manager.disconnect(user_id)
 
         # Send user left notification
         leave_message = {
             "type": "user_left",
             "user_id": user_id,
+            "text": f"User {user_id} left the chat",
             "timestamp": datetime.now().isoformat(),
-            "message": f"User {user_id} left the chat"
+            "message_id": str(uuid.uuid4())
         }
-        await manager.broadcast(json.dumps(leave_message))
+        await manager.broadcast(json.dumps(leave_message), save_to_db=False)
 
-@app.get("/users/online")
-async def get_online_users():
-    return {
-        "online_users": list(manager.active_connections.keys()),
-        "count": len(manager.active_connections)
-    }
+# Mount static files - adjust path for Docker working directory
+app.mount("/frontend", StaticFiles(directory="../frontend", html=True), name="static")
 
 if __name__ == "__main__":
     import uvicorn
     import os
 
-    # For local development with HTTPS (create self-signed certs)
+    # For local development with HTTPS
     ssl_keyfile = "key.pem"
     ssl_certfile = "cert.pem"
 
@@ -273,5 +178,5 @@ if __name__ == "__main__":
             ssl_certfile=ssl_certfile
         )
     else:
-        print("⚠️  Starting with HTTP (create SSL certs for HTTPS)")
+        print("⚠️  Starting without HTTPS")
         uvicorn.run(app, host="0.0.0.0", port=8000)
